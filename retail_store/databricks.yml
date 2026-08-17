@@ -1,0 +1,76 @@
+# This is a Declarative Automation Bundle definition for my_bundle.
+# See https://docs.databricks.com/dev-tools/bundles/index.html for documentation.
+bundle:
+  name: retail_store
+  uuid: b51f479f-54e9-4afe-97ed-1626076621af
+
+include:
+  - resources/*.yml
+
+artifacts:
+  python_artifact:
+    type: whl
+    build: uv build --wheel
+
+# sync:
+#   paths:
+#     - .
+    
+# Variable declarations. These variables are assigned in the dev/prod targets below.
+variables:
+  catalog:
+    description: The catalog to use
+  schema:
+    description: The schema to use
+
+targets:
+  dev:
+    # The default target uses 'mode: development' to create a development copy.
+    # - Deployed resources get prefixed with '[dev my_user_name]'
+    # - Any job schedules and triggers are paused by default.
+    # See also https://docs.databricks.com/dev-tools/bundles/deployment-modes.html.
+    mode: development
+    default: true
+    presets:
+      source_linked_deployment: false
+    workspace:
+      host: https://dbc-2ec70eee-9839.cloud.databricks.com
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}
+      file_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}
+    variables:
+      catalog: retail_store
+      schema: bronze #${workspace.current_user.short_name}
+
+  prod:
+    mode: production
+    workspace:
+      host: https://dbc-2ec70eee-9839.cloud.databricks.com
+      # We explicitly deploy to /Workspace/Users/${workspace.current_user.userName} to make sure we only have a single copy.
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
+    variables:
+      catalog: retail_store
+      schema: prod
+    permissions:
+      - user_name: ${workspace.current_user.userName}
+        level: CAN_MANAGE
+
+resources:
+  jobs:
+    employees_etl_setup_and_run:
+      name: employees-etl-setup-and-run
+      tasks:
+        - task_key: create_catalog_schema
+          notebook_task:
+            notebook_path: src/etl/ddl/create_schema.ipynb
+            base_parameters:
+              catalog_name: ${var.catalog}
+              schema_name: ${var.schema}
+
+        - task_key: add_permissions
+          depends_on:
+            - task_key: create_catalog_schema
+          notebook_task:
+            notebook_path: src/etl/ddl/add_permissions.ipynb
+            base_parameters:
+              catalog_name: ${var.catalog}
+
