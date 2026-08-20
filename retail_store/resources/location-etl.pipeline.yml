@@ -1,0 +1,20 @@
+resources:
+  pipelines:
+    location-etl:
+      name: location-etl
+      configuration:
+        "bronze_schema": "bronze"
+        "gold_schema": "gold"
+        "shared_dir_path": "/Workspace/Users/${workspace.current_user.userName}/databricks-data-engineer/retail_store/shared/"
+        "silver_schema": "silver"
+        "source_path": /Volumes/retail_store/bronze/raw_data
+      libraries:
+        - glob:
+            include: ../src/etl/pipelines/location-etl/transformations/**
+      catalog: ${var.catalog}
+      schema: ${var.schema}
+      channel: CURRENT
+      continuous: false
+      photon: true
+      root_path: ../src/etl/pipelines/location-etl
+      serverless: true

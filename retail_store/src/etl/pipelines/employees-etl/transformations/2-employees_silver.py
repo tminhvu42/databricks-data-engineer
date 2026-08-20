@@ -3,33 +3,36 @@ from pyspark.sql.functions import *
 from pyspark.sql.types import *
 from utilities.rules_module import *
 
-def get_rules(tag):
-  """
-    loads data quality rules from a table
-    :param tag: tag to match
-    :return: dictionary of rules that matched the tag
-  """
-  return {
-    row['name']: row['constraint']
-    for row in get_rules_as_list_of_dict()
-    if row['tag'] == tag
-  }
+# def get_rules(tag):
+#   """
+#     loads data quality rules from a table
+#     :param tag: tag to match
+#     :return: dictionary of rules that matched the tag
+#   """
+#   return {
+#     row['name']: row['constraint']
+#     for row in get_rules_as_list_of_dict()
+#     if row['tag'] == tag
+#   }
 
-
-path = spark.conf.get("source_path")
+table_name = "employees"
 bronze_schema = spark.conf.get("bronze_schema")
 silver_schema = spark.conf.get("silver_schema")
 
 dp.create_streaming_table(
-    name = f"{silver_schema}.employees",
-    comment = "employees table in silver layer. SCD Type 1",
-    expect_all_or_drop = get_rules("validity")
+    name = f"{silver_schema}.{table_name}",
+    comment = f"{table_name} table in silver layer. SCD Type 1",
+    table_properties = {
+      "delta.autoOptimize.optimizeWrite": "true",
+      "delta.autoOptimize.autoCompact": "true"
+    },
+    expect_all_or_drop = rules_fetcher.get_rules("employees-etl", "silver_employees")
 )
 
-@dp.temporary_view()
-def bronze_stream():
+@dp.temporary_view(name = f"vw_{table_name}_bronze_stream")
+def bronze_employees_stream():
     return (
-        spark.readStream.option("skipChangeCommits", "true").table(f"{bronze_schema}.employees")
+        spark.readStream.option("skipChangeCommits", "true").table(f"{bronze_schema}.{table_name}")
         .withColumn("employee_id", col("employee_id").cast(IntegerType()))
         .withColumn("hire_date", col("hire_date").cast(DateType()))
         .withColumn("termination_date", col("termination_date").cast(DateType()))
@@ -41,8 +44,8 @@ def bronze_stream():
 
 
 dp.create_auto_cdc_flow(
-    target = f"{silver_schema}.employees",
-    source = "bronze_stream",
+    target = f"{silver_schema}.{table_name}",
+    source = f"vw_{table_name}_bronze_stream",
     keys = ["employee_id"],
     sequence_by = col("modified_date"),
     except_column_list = ["_rescued_data", "year", "month", "day", "ingestion_ts"],
