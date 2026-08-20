@@ -2,21 +2,21 @@
 
 resources:
   pipelines:
-    employees-etl:
-      name: employees-etl
+    departments-etl:
+      name: departments-etl
       catalog: ${var.catalog}
       schema: ${var.schema}
       serverless: true
-      root_path: "../src/etl/pipelines/employees-etl"
+      root_path: "../src/etl/pipelines/sales-etl"
       configuration:
         "bronze_schema": "bronze"
         "gold_schema": "gold"
-        "shared_dir_path": "/Workspace/Users/${workspace.current_user.userName}/databricks-data-engineer/retail_store/shared/"
+        "shared_dir_path": /Workspace/Users/${workspace.current_user.userName}/databricks-data-engineer/retail_store/shared/
         "silver_schema": "silver"
         "source_path": "/Volumes/retail_store/bronze/raw_data"
       libraries:
         - glob:
-            include: ../src/etl/pipelines/employees-etl/transformations/**
+            include: ../src/etl/pipelines/sales-etl/transformations/**
 
       environment:
         dependencies:
